@@ -1,0 +1,43 @@
+/* mixcredit 设计令牌：媒体投放看板 × 杂志排版。
+   珊瑚红 + 象牙白 + 大字号数字；米色纸面，禁纯黑纯白。 */
+:root {
+  --paper: oklch(0.962 0.018 84);
+  --paper-2: oklch(0.936 0.022 82);
+  --paper-3: oklch(0.905 0.028 80);
+  --ink: oklch(0.27 0.03 45);
+  --ink-soft: oklch(0.44 0.026 48);
+  --ink-faint: oklch(0.58 0.02 50);
+  --rule: oklch(0.84 0.026 78);
+  --rule-strong: oklch(0.7 0.045 55);
+
+  --accent: oklch(0.6 0.19 30);
+  --accent-deep: oklch(0.48 0.16 30);
+  --accent-soft: oklch(0.72 0.13 35);
+  --accent-wash: oklch(0.94 0.045 40);
+  --ok: oklch(0.48 0.08 155);
+  --ok-wash: oklch(0.93 0.03 155);
+  --warn: oklch(0.62 0.11 70);
+  --warn-wash: oklch(0.94 0.04 78);
+  --danger: oklch(0.52 0.17 28);
+  --danger-wash: oklch(0.94 0.045 30);
+  --info: oklch(0.48 0.06 235);
+  --info-wash: oklch(0.93 0.025 235);
+
+  --font-display: 'Playfair Display', 'Noto Sans SC', 'Songti SC', Georgia, serif;
+  --font-body: 'Noto Sans SC', 'PingFang SC', 'Hiragino Sans GB', sans-serif;
+  --font-mono: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+
+  --fs-xs: 0.7rem;
+  --fs-sm: 0.8rem;
+  --fs-md: 0.92rem;
+  --fs-lg: 1.16rem;
+  --fs-xl: clamp(1.6rem, 2.4vw, 2.4rem);
+  --fs-2xl: clamp(2.4rem, 4.4vw, 4rem);
+  --fs-figure: clamp(3.2rem, 7vw, 6rem);
+
+  --pad: clamp(16px, 1.9vw, 32px);
+  --rail: 214px;
+  --radius: 2px;
+  --shadow: 0 1px 0 oklch(0.86 0.02 78), 0 22px 44px -38px oklch(0.35 0.05 45 / 0.5);
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+}
