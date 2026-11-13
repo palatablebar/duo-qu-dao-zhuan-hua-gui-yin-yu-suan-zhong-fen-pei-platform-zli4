@@ -1,13 +1,15 @@
-"""导出服务：归因结果 + 预算建议 CSV。"""
+"""导出服务：归因结果 + 预算建议 + 余额台账 CSV。"""
 from __future__ import annotations
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from src.constants.enums import CHANNEL_TYPE_LABELS, REVIEW_STATUS_LABELS, RUN_STATUS_LABELS
+from src.constants.enums import BILL_KIND_LABELS, CHANNEL_TYPE_LABELS, REVIEW_STATUS_LABELS, RUN_STATUS_LABELS
 from src.models.attribution import Attribution
 from src.models.attribution_run import AttributionRun
+from src.models.billing import BillBatch, BillEntry
 from src.models.channel import Channel
+from src.services import billing_service
 from src.utils.csv_export import to_csv
 
 
@@ -68,4 +70,63 @@ def runs_csv(db: Session) -> bytes:
         ]
         for run in runs
     ]
+    return to_csv(headers, lines)
+
+
+def balances_csv(db: Session) -> bytes:
+    """余额台账：与页面 /api/billing/overview 共用 channel_balances()，保证导出与页面一致。"""
+    data = billing_service.channel_balances(db)
+    headers = ["渠道编码", "渠道名称", "渠道类型", "月度预算", "净消耗", "在途占用", "可用余额"]
+    lines = [
+        [
+            item["code"],
+            item["name"],
+            item["type_label"],
+            f"{item['budget']:.2f}",
+            f"{item['net_spend']:.2f}",
+            f"{item['held']:.2f}",
+            f"{item['available']:.2f}",
+        ]
+        for item in data["items"]
+    ]
+    totals = data["totals"]
+    lines.append(
+        [
+            "合计",
+            "",
+            "",
+            f"{totals['budget']:.2f}",
+            f"{totals['net_spend']:.2f}",
+            f"{totals['held']:.2f}",
+            f"{totals['available']:.2f}",
+        ]
+    )
+    return to_csv(headers, lines)
+
+
+def bill_entries_csv(db: Session) -> bytes:
+    rows = db.scalars(select(BillEntry).order_by(BillEntry.id)).all()
+    batches = {row.id: row for row in db.scalars(select(BillBatch)).all()}
+    channels = {row.id: row for row in db.scalars(select(Channel)).all()}
+    entries_by_id = {row.id: row for row in rows}
+    headers = ["批次号", "行号", "账期", "渠道", "类型", "金额", "冲正指向", "备注", "操作人", "入账时间"]
+    lines = []
+    for entry in rows:
+        batch = batches.get(entry.batch_id)
+        channel = channels.get(entry.channel_id)
+        reversed_entry = entries_by_id.get(entry.reverses_id) if entry.reverses_id else None
+        lines.append(
+            [
+                batch.batch_no if batch else "",
+                entry.row_no,
+                batch.period if batch else "",
+                channel.name if channel else "",
+                BILL_KIND_LABELS.get(entry.kind, entry.kind),
+                f"{entry.amount:.2f}",
+                reversed_entry.entry_no if reversed_entry else "",
+                entry.memo or "",
+                batch.created_by if batch else "",
+                entry.created_at.strftime("%Y-%m-%d %H:%M") if entry.created_at else "",
+            ]
+        )
     return to_csv(headers, lines)

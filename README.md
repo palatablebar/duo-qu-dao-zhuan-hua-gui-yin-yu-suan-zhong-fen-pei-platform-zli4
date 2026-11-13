@@ -14,8 +14,8 @@
 
 | 角色 | 账号 | 权限 | 典型动作 |
 |---|---|---|---|
-| 增长管理员 `admin` | `admin@mixcredit.io` | 渠道写 + 运行 + 复核 + 导出 + 审计 | 改渠道预算、导出归因 CSV、查看审计 |
-| 归因分析师 `analyst` | `analyst@mixcredit.io` | 运行 + 复核 + 读 | 发起归因、提交复核结论 |
+| 增长管理员 `admin` | `admin@mixcredit.io` | 渠道写 + 账单入账/审批 + 运行 + 复核 + 导出 + 审计 | 改渠道预算、账单批次入账、预算调整审批、导出归因 CSV、查看审计 |
+| 归因分析师 `analyst` | `analyst@mixcredit.io` | 运行 + 复核 + 读（含账单只读） | 发起归因、提交复核结论、查看余额与批次 |
 | 渠道只读 `viewer` | `viewer@mixcredit.io` | 只读结果（成本明细隐藏） | 看总览/渠道对比/预算建议，不能复核与导出 |
 
 密码统一 `Demo@2026`。低权角色调用高权接口返回 **403**（真实 HTTP 状态）；无 token 返回 **401**；非法参数 **422**；重复渠道编码 **409**。viewer 的成本、ROI、建议预算字段由后端置空（`costs_hidden: true`），不是前端隐藏。
@@ -27,6 +27,7 @@
 3. **渠道对比**（`/api/attributions`）：last-click / 马尔可夫 / Shapley 三口径并列；analyst 与 admin 复核（pending/confirmed/dismissed）。
 4. **预算建议与导出**：当前预算 vs 建议预算、变动幅度、ROI；`/api/exports/attributions.csv` 导出（UTF-8 BOM，5 行）。
 5. **审计与心跳**：登录、改预算、发起运行、复核、导出全量审计；Celery beat 每 10s 写 worker 心跳，总览展示在岗状态。
+6. **账单与余额**（`/api/billing`）：财务合并的消耗/退款账单按批次入账——整批成功或整批失败；台账只追加，纠错用冲正分录；预算调整先占用再批准，两名经理同时提交不会占用同一笔余额；页面展示批次结果、可用余额与在途占用，`/api/exports/balances.csv` 与页面同源计算。
 
 ## 4. 快速启动
 
@@ -77,6 +78,14 @@ docker compose exec -T backend python -m pytest tests -q
 4. 新预算：`权重 = 当前预算 × (ROI/平均ROI)^0.7`，目标 = 总预算 × 权重占比；品牌搜索保底 12%；单渠道变动 ≤ ±30%；水位法迭代锁定触边渠道，残差补到最大渠道，保证合计恒等于总预算。
 5. 失败态：无渠道/无触点 → 运行 `failed`/`partial` 并写日志；空路径 `v=0`，占比全 0，不抛错。
 
+### 账单与预算占用（事务口径）
+
+1. **批次原子性**：全部行先校验再同事务写入；任一行失败 → 整批不落账，只留一条 `failed` 批次记录（含逐行失败原因）。`batch_no` 是幂等键：同号同内容重试返回原批次，同号不同内容 409。
+2. **台账只追加**：`bill_entries` 不 UPDATE/DELETE；冲正生成 `reversal` 分录（金额 = −原分录，自成一个冲正批次），`reverses_id` 唯一约束保证一条记录只能被冲正一次，冲正单不能再冲正。
+3. **可用余额** = 月度预算 − 净消耗 − 在途占用。占用用一条原子 `UPDATE channels SET held_amount = held_amount + x WHERE 预算 − 在途 − 净消耗 >= x` 完成「校验 + 扣减」：两名经理同时提交时数据库行锁串行化，第二名必然 409，不会占用同一笔余额。
+4. **先占用再批准**：调整单 `held → approved/rejected`，状态迁移用 CAS（`WHERE status='held'`），重复审批 409；批准时预算与占用在同一事务回写。`request_key` 幂等，重试/双击不产生重复占用。
+5. **导出与页面一致**：`/api/billing/overview` 与 `/api/exports/balances.csv` 共用 `channel_balances()` 同一函数计算。
+
 ## 8. 共享枚举出现位置
 
 | 枚举 | 后端 | 前端 |
@@ -86,6 +95,9 @@ docker compose exec -T backend python -m pytest tests -q
 | 归因口径 `markov/last_click/shapley` | `backend/src/constants/enums.py` | `frontend/site/js/config.js`（`ENUMS.model`） |
 | 复核状态 `pending/confirmed/dismissed` | `backend/src/constants/enums.py` | `frontend/site/js/config.js`（`ENUMS.review`） |
 | 运行状态 `queued/running/success/partial/failed` | `backend/src/constants/enums.py` | `frontend/site/js/config.js`（`ENUMS.runStatus`） |
+| 台账类型 `spend/refund/reversal` | `backend/src/constants/enums.py` | `frontend/site/js/config.js`（`ENUMS.billKind`） |
+| 批次状态 `posted/failed` | `backend/src/constants/enums.py` | `frontend/site/js/config.js`（`ENUMS.batchStatus`） |
+| 调整状态 `held/approved/rejected` | `backend/src/constants/enums.py` | `frontend/site/js/config.js`（`ENUMS.adjustStatus`） |
 
 ## 9. 目录
 
@@ -94,9 +106,10 @@ backend/
   src/{config,constants,controllers,middlewares,models,routes,schemas,services,utils}
       services/algorithms.py        # 两个纯函数算法
       services/attribution_service.py  # 编排/落库/预算方案
+      services/billing_service.py   # 批次入账 / 冲正 / 预算占用（事务口径）
   scripts/{business_seed.py,seed_demo.py,demo_config.py,worker_healthcheck.sh}
-  migrations/001_core_tables.sql
-  tests/{test_algorithms.py,test_security.py}
+  migrations/{001_core_tables.sql,002_billing.sql}
+  tests/{test_algorithms.py,test_security.py,test_billing.py,test_billing_api.py}
 frontend/
   site/{index.html,css/{tokens,app}.css,js/{config,api,store,ui,app}.js,js/pages/*.js}
 ```

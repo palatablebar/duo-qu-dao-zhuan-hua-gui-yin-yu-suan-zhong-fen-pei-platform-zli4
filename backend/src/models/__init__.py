@@ -13,6 +13,7 @@ from src.models.touchpoint import Touchpoint  # noqa: E402
 from src.models.conversion import Conversion  # noqa: E402
 from src.models.attribution_run import AttributionRun  # noqa: E402
 from src.models.attribution import Attribution  # noqa: E402
+from src.models.billing import BillBatch, BillEntry, BudgetAdjustment  # noqa: E402
 
 __all__ = [
     "Base",
@@ -23,4 +24,7 @@ __all__ = [
     "Conversion",
     "AttributionRun",
     "Attribution",
+    "BillBatch",
+    "BillEntry",
+    "BudgetAdjustment",
 ]

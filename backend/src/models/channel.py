@@ -19,6 +19,7 @@ class Channel(Base):
     type: Mapped[str] = mapped_column(String(20), index=True)
     monthly_cost: Mapped[float] = mapped_column(Float, default=0.0)
     budget: Mapped[float] = mapped_column(Float, default=0.0)
+    held_amount: Mapped[float] = mapped_column(Float, default=0.0)  # 在途占用（预算调整未批准部分）
     owner: Mapped[str] = mapped_column(String(80), default="清野日化 · 增长组")
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)

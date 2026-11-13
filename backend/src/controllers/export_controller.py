@@ -42,3 +42,39 @@ def runs_csv(db: Session, principal: dict, request: Request) -> Response:
     )
     db.commit()
     return Response(content=content, media_type="text/csv; charset=utf-8", headers=csv_response_headers("runs.csv"))
+
+
+def balances_csv(db: Session, principal: dict, request: Request) -> Response:
+    content = export_service.balances_csv(db)
+    audit_service.record(
+        db,
+        actor_email=principal["email"],
+        actor_role=principal["role"],
+        action="export.balances",
+        entity="channel",
+        entity_id=None,
+        detail={"bytes": len(content), "kind": "balances"},
+        ip=request.client.host if request.client else None,
+    )
+    db.commit()
+    return Response(content=content, media_type="text/csv; charset=utf-8", headers=csv_response_headers("balances.csv"))
+
+
+def bill_entries_csv(db: Session, principal: dict, request: Request) -> Response:
+    content = export_service.bill_entries_csv(db)
+    audit_service.record(
+        db,
+        actor_email=principal["email"],
+        actor_role=principal["role"],
+        action="export.balances",
+        entity="bill_entry",
+        entity_id=None,
+        detail={"bytes": len(content), "kind": "bill_entries"},
+        ip=request.client.host if request.client else None,
+    )
+    db.commit()
+    return Response(
+        content=content,
+        media_type="text/csv; charset=utf-8",
+        headers=csv_response_headers("bill-entries.csv"),
+    )

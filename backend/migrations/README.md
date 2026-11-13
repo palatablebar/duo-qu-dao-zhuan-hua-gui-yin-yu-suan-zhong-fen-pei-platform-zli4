@@ -5,5 +5,7 @@
 
 - `001_core_tables.sql`：核心表的人类可读 DDL 参考（PostgreSQL 语法），用于 reviewer 对照字段；
   运行时不执行它。
+- `002_billing.sql`：账单批次 / 台账分录 / 预算调整三张新表 + `channels.held_amount` 列。
+  新库由 `create_all` 自动建好；老库升级只需手动执行文件里的 `ALTER TABLE` 一行。
 - 后续如果要做字段变更，建议引入 Alembic，并在本目录按 `00x_<描述>.py` 递增。
 - seed 数据只走 `backend/scripts/seed_demo.py`，不要写进 SQL。

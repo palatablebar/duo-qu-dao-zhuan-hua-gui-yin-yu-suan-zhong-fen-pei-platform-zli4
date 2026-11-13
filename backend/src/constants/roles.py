@@ -23,6 +23,7 @@ PERMISSIONS: dict[str, set[str]] = {
         "run:read", "run:create",
         "attribution:read", "attribution:review",
         "plan:read", "export:read", "audit:read",
+        "billing:read", "billing:write",
     },
     Role.ANALYST.value: {
         "overview:read",
@@ -31,6 +32,7 @@ PERMISSIONS: dict[str, set[str]] = {
         "run:read", "run:create",
         "attribution:read", "attribution:review",
         "plan:read",
+        "billing:read",
     },
     Role.VIEWER.value: {
         "overview:read", "channel:read", "run:read", "attribution:read", "plan:read",
@@ -43,6 +45,8 @@ REVIEW_ROLES = (Role.ADMIN.value, Role.ANALYST.value)
 EXPORT_ROLES = (Role.ADMIN.value,)
 AUDIT_ROLES = (Role.ADMIN.value,)
 READ_ROLES = (Role.ADMIN.value, Role.ANALYST.value, Role.VIEWER.value)
+BILLING_READ_ROLES = (Role.ADMIN.value, Role.ANALYST.value)
+BILLING_WRITE_ROLES = (Role.ADMIN.value,)
 
 
 def has_permission(role: str, permission: str) -> bool:

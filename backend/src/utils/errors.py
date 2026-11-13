@@ -8,6 +8,8 @@ ERROR_MESSAGES: dict[str, str] = {
     "NOT_FOUND": "资源不存在",
     "VALIDATION": "请求参数不合法",
     "CONFLICT": "数据冲突，请刷新后重试",
+    "BATCH_FAILED": "账单批次入账失败",
+    "INSUFFICIENT_BALANCE": "可用余额不足",
     "RATE_LIMITED": "请求过于频繁，请稍后再试",
     "INTERNAL": "服务内部错误",
 }

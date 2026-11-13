@@ -28,3 +28,21 @@ def runs_csv(
     principal: dict = Depends(require_roles(*EXPORT_ROLES)),
 ):
     return export_controller.runs_csv(db, principal, request)
+
+
+@router.get("/balances.csv")
+def balances_csv(
+    request: Request,
+    db: Session = Depends(get_db),
+    principal: dict = Depends(require_roles(*EXPORT_ROLES)),
+):
+    return export_controller.balances_csv(db, principal, request)
+
+
+@router.get("/bill-entries.csv")
+def bill_entries_csv(
+    request: Request,
+    db: Session = Depends(get_db),
+    principal: dict = Depends(require_roles(*EXPORT_ROLES)),
+):
+    return export_controller.bill_entries_csv(db, principal, request)

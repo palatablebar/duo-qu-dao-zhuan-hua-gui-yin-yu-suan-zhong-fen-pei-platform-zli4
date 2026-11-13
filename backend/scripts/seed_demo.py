@@ -14,16 +14,29 @@ from __future__ import annotations
 from sqlalchemy import func, select
 
 from scripts.business_seed import BRAND, CHANNELS, PERIOD, build_dataset
-from scripts.demo_config import DEMO_PASSWORD, DEMO_USERS, ORG, SEED_AUDIT, SEED_RUN_KEY
+from scripts.demo_config import (
+    DEMO_PASSWORD,
+    DEMO_USERS,
+    ORG,
+    SEED_ADJUST_CHANNEL,
+    SEED_ADJUST_DELTA,
+    SEED_ADJUST_KEY,
+    SEED_ADJUST_REASON,
+    SEED_AUDIT,
+    SEED_BILL_BATCH_NO,
+    SEED_BILL_ROWS,
+    SEED_RUN_KEY,
+)
 from src.config.database import session_scope
 from src.models.attribution import Attribution
 from src.models.attribution_run import AttributionRun
 from src.models.audit import AuditLog
+from src.models.billing import BillEntry, BudgetAdjustment
 from src.models.channel import Channel
 from src.models.conversion import Conversion
 from src.models.touchpoint import Touchpoint
 from src.models.user import User
-from src.services import attribution_service
+from src.services import attribution_service, billing_service
 from src.utils.security import hash_password
 
 
@@ -137,6 +150,39 @@ def ensure_audit(db) -> None:
     db.flush()
 
 
+def ensure_billing(db) -> tuple[int, int]:
+    """账单批次 + 在途占用：走 service 函数，幂等键与线上入口完全一致。"""
+    billing_service.submit_batch(
+        db,
+        {
+            "batch_no": SEED_BILL_BATCH_NO,
+            "period": PERIOD,
+            "rows": [
+                {"channel_code": code, "kind": kind, "amount": amount, "memo": memo}
+                for code, kind, amount, memo in SEED_BILL_ROWS
+            ],
+        },
+        operator_email="admin@mixcredit.io",
+    )
+    live = db.scalar(select(Channel).where(Channel.code == SEED_ADJUST_CHANNEL))
+    if live is not None:
+        billing_service.create_adjustment(
+            db,
+            {
+                "channel_id": live.id,
+                "delta": SEED_ADJUST_DELTA,
+                "reason": SEED_ADJUST_REASON,
+                "request_key": SEED_ADJUST_KEY,
+            },
+            operator_email="admin@mixcredit.io",
+        )
+    db.flush()
+    return (
+        db.scalar(select(func.count()).select_from(BillEntry)) or 0,
+        db.scalar(select(func.count()).select_from(BudgetAdjustment)) or 0,
+    )
+
+
 def seed_all() -> dict:
     with session_scope() as db:
         users = ensure_users(db)
@@ -145,11 +191,12 @@ def seed_all() -> dict:
         ensure_events(db)
         runs = ensure_run(db)
         ensure_audit(db)
+        bills, holds = ensure_billing(db)
         findings = db.scalar(select(func.count()).select_from(Attribution)) or 0
         pending = db.scalar(select(func.count()).select_from(Attribution).where(Attribution.status == "pending")) or 0
         summary = (
             f"SEED_SUMMARY brand={BRAND} users={users} sources={sources} "
-            f"runs={runs} findings={findings} pending={pending}"
+            f"runs={runs} findings={findings} pending={pending} bills={bills} holds={holds}"
         )
         print(summary, flush=True)
         return {
@@ -158,6 +205,8 @@ def seed_all() -> dict:
             "runs": runs,
             "findings": findings,
             "pending": pending,
+            "bills": bills,
+            "holds": holds,
         }
 
 
